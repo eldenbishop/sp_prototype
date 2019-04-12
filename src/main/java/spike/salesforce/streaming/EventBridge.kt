@@ -32,8 +32,16 @@ class EventBridge(val partition: Int) {
 
     fun stopAll() {
         synchronized(pollThreads) {
+            val threads = ArrayList<Thread>()
+            // *** tell all the threads to exit
             pollThreads.keys.toList().forEach {
-                day0Stop(it)
+                val pollThread = pollThreads.remove(it)!!
+                pollThread.stopping = true
+                threads.add(pollThread)
+            }
+            // *** now wait for each thread to exit
+            threads.forEach {
+                it.join()
             }
         }
     }
