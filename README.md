@@ -76,8 +76,3 @@ rebalancing.
 Refactor to use explicit topics instead of partitions. This will allow simpler unbounded scaling
 since Ajna restricts and manages the maximum number of partitions.
 
-## Good/Bad
-
-Rebalancing is triggered automatically as workers enter and leave the pool (which is good) but tend to
-rebuild the entire cluster (this is kind of bad). A less aggressive rebalance using consistent hashing
-would be preferred long term so that a minimum number of subscriptions need to be restarted.
