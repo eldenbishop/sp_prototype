@@ -1,4 +1,4 @@
-package spike.salesforce.streaming
+package spike.salesforce.streaming.lib
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -10,24 +10,25 @@ import org.apache.kafka.common.TopicPartition
 import java.time.Duration
 
 class Supervisor(
-    val gson: Gson,
     val consumer: Consumer<Long, String>,
     val producer: Producer<Long, String>
 ) : Runnable, ConsumerRebalanceListener {
 
+    val gson = GsonBuilder().setPrettyPrinting().create()
     val numPartitions: Int
-    val eventBridges = HashMap<Int,EventBridge>()
+    val eventBridges = HashMap<Int, EventBridge>()
     val thread: Thread
+    var dirty = HashSet<Int>()
 
     init {
         numPartitions = consumer.partitionsFor("supervisor").size
-        consumer.subscribe(listOf("supervisor"), this)
         thread = Thread(this)
         thread.isDaemon = true
         thread.start()
     }
 
     override fun run() {
+        consumer.subscribe(listOf("supervisor"), this)
         while (true) {
             val records = consumer.poll(Duration.ofSeconds(5))
             if (!records.isEmpty) {
@@ -46,7 +47,17 @@ class Supervisor(
                         }
                     }
                 }
-                consumer.commitAsync()
+            }
+            synchronized(dirty) {
+                if (dirty.size > 0) {
+                    dirty.forEach { partition ->
+                        producer.send(ProducerRecord("monitor", 0, 0L, gson.toJson(linkedMapOf(
+                                "type" to "supervisorRefresh",
+                                "supervisorId" to partition
+                        ))))
+                    }
+                    dirty.clear()
+                }
             }
         }
     }
@@ -65,17 +76,15 @@ class Supervisor(
 
     override fun onPartitionsAssigned(topicPartitions: MutableCollection<TopicPartition>?) {
         synchronized(eventBridges) {
-            topicPartitions?.forEach { topicPartition ->
-                val removed = eventBridges.remove(topicPartition.partition())
-                if (removed != null) {
-                    removed.stopAll()
+            synchronized(dirty) {
+                topicPartitions?.forEach { topicPartition ->
+                    val partition = topicPartition.partition()
+                    if (!eventBridges.containsKey(partition)) {
+                        val toAdd = EventBridge(partition)
+                        eventBridges.put(partition, toAdd)
+                        dirty.add(partition)
+                    }
                 }
-                val toAdd = EventBridge(topicPartition.partition())
-                eventBridges.put(topicPartition.partition(), toAdd)
-                producer.send(ProducerRecord("monitor", 0, 0L, gson.toJson(linkedMapOf(
-                    "type" to "supervisorRefresh",
-                    "supervisorId" to topicPartition.partition()
-                ))))
             }
         }
     }

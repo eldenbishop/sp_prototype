@@ -10,6 +10,7 @@ plugins {
 }
 
 repositories {
+    jcenter()
     mavenLocal()
     mavenCentral()
 }
@@ -26,5 +27,35 @@ dependencies {
     compile "com.sparkjava:spark-kotlin:1.0.0-alpha"
     compile "org.apache.kafka:kafka-clients:2.2.0"
     compile "org.slf4j:slf4j-simple:1.7.25"
+    compile "com.j2html:j2html:1.2.0"
 }
 
+task start_monitor(type:JavaExec) {
+    main = "spike.salesforce.streaming.demo.DemoMonitorKt"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task start_worker(type:JavaExec) {
+    main = "spike.salesforce.streaming.demo.DemoSupervisor8080Kt"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task start_worker_8080(type:JavaExec) {
+    main = "spike.salesforce.streaming.demo.DemoSupervisor8080Kt"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task start_worker_8081(type:JavaExec) {
+    main = "spike.salesforce.streaming.demo.DemoSupervisor8081Kt"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task start_worker_8082(type:JavaExec) {
+    main = "spike.salesforce.streaming.demo.DemoSupervisor8082Kt"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task start_worker_8083(type:JavaExec) {
+    main = "spike.salesforce.streaming.demo.DemoSupervisor8083Kt"
+    classpath = sourceSets.main.runtimeClasspath
+}

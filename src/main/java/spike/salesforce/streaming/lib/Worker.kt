@@ -1,6 +1,5 @@
-package spike.salesforce.streaming
+package spike.salesforce.streaming.lib
 
-import com.google.gson.GsonBuilder
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -11,9 +10,9 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.LongDeserializer
-import org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG
 
-val BOOTSTRAP_SERVERS_CONFIG = "127.0.0.1:9092"
+val BOOTSTRAP_SERVERS_CONFIG = "ebishop-ltm1.internal.salesforce.com:9092"
+//val BOOTSTRAP_SERVERS_CONFIG = "127.0.0.1:9092"
 
 fun buildProducer(clientId: String) : KafkaProducer<Long,String> {
     val props = Properties()
@@ -30,33 +29,34 @@ fun buildConsumer(groupId: String, topic: String): Consumer<Long, String> {
     props[ConsumerConfig.GROUP_ID_CONFIG] = groupId
     props[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = LongDeserializer::class.java.name
     props[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java.name
-    props[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = "false"
-    props[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = "earliest"
+    props[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = "false" // *** TODO: we don't commit, explain
+    props[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = "latest" // *** TODO: explain
     val consumer = KafkaConsumer<Long,String>(props)
     consumer.subscribe(Collections.singletonList(topic))
     return consumer
 }
 
-fun hasRole(role: String, args: Array<String>) = args.asList().contains(role)
+class Worker(
+        val port: Int,
+        val roles: List<String>
+) {
+    fun start() {
 
-fun main(args: Array<String>) {
+        val publisher = buildProducer("stream-processing")
 
-    val port = Integer.parseInt(args[0])
+        // Launch the monitor/master singleton (negotiated with a lock)
+        // *** normally all workers would run this but we need isolated roles for the demo
+        if (roles.contains("monitor")) {
+            Monitor(buildConsumer("sp-monitor", "monitor"), publisher)
+        }
 
-    val gson = GsonBuilder().setPrettyPrinting().create()
-    val producer = buildProducer("stream-processing")
+        // *** Launch the supervisor
+        // *** normally all workers would run this but we need isolated roles for the demo
+        if (roles.contains("supervisor")) {
+            Supervisor(buildConsumer("sp-supervisor", "supervisor"), publisher)
+        }
 
-    val api = Api(producer, port)
-    api.start()
-
-    if (hasRole("monitor", args)) {
-        val monitorConsumer = buildConsumer("sp-monitor", "monitor")
-        val monitor = Monitor(gson, monitorConsumer, producer)
+        // *** Launch the REST API
+        RestApi(publisher, port).start()
     }
-
-    if (hasRole("supervisor", args)) {
-        val supervisorConsumer = buildConsumer("sp-supervisor", "supervisor")
-        val supervisor = Supervisor(gson, supervisorConsumer, producer)
-    }
-
 }

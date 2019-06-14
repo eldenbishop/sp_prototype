@@ -1,4 +1,4 @@
-package spike.salesforce.streaming
+package spike.salesforce.streaming.lib
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -11,7 +11,6 @@ import java.time.Duration
 import java.util.*
 
 class Monitor(
-    val gson: Gson,
     val consumer: Consumer<Long, String>,
     val producer: Producer<Long, String>
 ) : Runnable, ConsumerRebalanceListener {
@@ -19,15 +18,18 @@ class Monitor(
     val numSupervisorPartitions: Int
     val day0Subscriptions = HashSet<String>()
     val thread = Thread(this)
+    val gson = GsonBuilder().setPrettyPrinting().create()
 
     init {
         numSupervisorPartitions = consumer.partitionsFor("supervisor").size
-        consumer.subscribe(Collections.singletonList("monitor"), this)
         thread.isDaemon = true
         thread.start()
     }
 
     override fun run() {
+        // *** Build subscription and do a quick poll to initialize offsets, ignore results
+        consumer.subscribe(Collections.singletonList("monitor"), this)
+        consumer.poll(Duration.ofMillis(1000)) // TODO: verify lock is acquired here
         while (true) {
             val records = consumer.poll(Duration.ofSeconds(5))
             if (!records.isEmpty) {
@@ -63,7 +65,6 @@ class Monitor(
                     println(map)
                     println("day0Subscriptions = ${day0Subscriptions}")
                 }
-                consumer.commitAsync()
             }
         }
     }

@@ -1,6 +1,4 @@
-package spike.salesforce.streaming
-
-import org.apache.kafka.common.TopicPartition
+package spike.salesforce.streaming.lib
 
 fun getPartitionForSuperTenant(superTenantId: String, numPartitions: Int) : Int {
     return Math.abs(superTenantId.hashCode()) % numPartitions
@@ -8,12 +6,12 @@ fun getPartitionForSuperTenant(superTenantId: String, numPartitions: Int) : Int 
 
 class EventBridge(val partition: Int) {
 
-    val pollThreads = HashMap<String,Day0PollThread>()
+    val pollThreads = HashMap<String, FakeDay0PollThread>()
 
     fun day0Start(superTenantId: String) {
         synchronized(pollThreads) {
             if (!pollThreads.containsKey(superTenantId)) {
-                val pollThread = Day0PollThread(superTenantId)
+                val pollThread = FakeDay0PollThread(superTenantId)
                 pollThread.start()
                 pollThreads.put(superTenantId, pollThread)
             }
